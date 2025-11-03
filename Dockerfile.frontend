@@ -1,0 +1,75 @@
+## Multi-stage build for Vite + React frontend
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install lightweight tools needed for some npm packages (git used by some deps)
+RUN apk add --no-cache git
+
+# Copy lockfile and package manifest first to leverage layer caching
+COPY frontend/package.json frontend/package-lock.json ./
+
+# Install all dependencies (including devDependencies required for build)
+RUN npm ci && npm install --no-audit --no-fund lucide-react
+
+# Copy source and build
+COPY frontend/ ./
+RUN npm run build
+
+# Final production image using nginx
+## Use a lightweight Node image to run Vite preview in production-like mode
+FROM nginx:alpine
+
+# Accept build arguments for API configuration
+ARG API_HOST=reposearch-api
+ARG API_PORT=8080
+
+# Copy built assets from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Generate nginx config with parameterized API backend
+RUN cat > /etc/nginx/conf.d/default.conf <<NGINX
+server {
+	listen 80;
+	server_name _;
+	root /usr/share/nginx/html;
+	index index.html;
+
+	# Serve static files; fallback to index.html for SPA routes
+	location / {
+		try_files \$uri \$uri/ /index.html;
+	}
+
+	# Proxy API calls to backend service
+	location /search {
+		proxy_pass http://${API_HOST}:${API_PORT};
+		proxy_set_header Host \$host;
+		proxy_set_header X-Real-IP \$remote_addr;
+		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto \$scheme;
+	}
+
+	# Proxy other API endpoints
+	location /repositories {
+		proxy_pass http://${API_HOST}:${API_PORT};
+		proxy_set_header Host \$host;
+		proxy_set_header X-Real-IP \$remote_addr;
+		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto \$scheme;
+	}
+
+	# Proxy auth endpoints
+	location /auth {
+		proxy_pass http://${API_HOST}:${API_PORT};
+		proxy_set_header Host \$host;
+		proxy_set_header X-Real-IP \$remote_addr;
+		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto \$scheme;
+	}
+}
+NGINX
+
+ENV NODE_ENV=production
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

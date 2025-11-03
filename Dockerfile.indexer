@@ -1,0 +1,32 @@
+# Multi-arch friendly Dockerfile
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+
+# Build-time target info provided by buildx
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+ARG GOARM
+
+WORKDIR /src
+
+# Cache deps
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy project
+COPY . .
+
+# Static build for the target platform
+ENV CGO_ENABLED=0 \
+    GOOS=${TARGETOS} \
+    GOARCH=${TARGETARCH} \
+    GOARM=${GOARM}
+
+RUN go build -trimpath -ldflags="-s -w" -o /app/indexer ./cmd/indexer
+
+FROM cgr.dev/chainguard/static
+COPY --from=builder /app/indexer /usr/local/bin/indexer
+
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/indexer"]
