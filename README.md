@@ -1,4 +1,5 @@
 # reposearch
+[![Coverage](https://img.shields.io/badge/Coverage-52.2%25-yellow)](https://github.com/seanblong/reposearch/actions/workflows/test.yaml)
 
 Repo Search provides natural language search for your repositories.  Rather than
 relying on keyword matching, it uses vector embeddings to find relevant code and
