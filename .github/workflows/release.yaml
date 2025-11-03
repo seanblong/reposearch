@@ -56,8 +56,7 @@ jobs:
           context: .
           file: ./Dockerfile.api
           push: true
-          platforms:
-            - linux/amd64
+          platforms: linux/amd64
           tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/api:${{ steps.version.outputs.v-version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -69,8 +68,7 @@ jobs:
           context: .
           file: ./Dockerfile.frontend
           push: true
-          platforms:
-            - linux/amd64
+          platforms: linux/amd64
           tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/frontend:${{ steps.version.outputs.v-version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -82,8 +80,7 @@ jobs:
           context: .
           file: ./Dockerfile.indexer
           push: true
-          platforms:
-            - linux/amd64
+          platforms: linux/amd64
           tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/indexer:${{ steps.version.outputs.v-version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
