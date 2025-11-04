@@ -106,6 +106,7 @@ func main() {
 	}
 }
 
+// cloneToTemp clones the given repo URL at the specified ref to a temporary directory
 func cloneToTemp(repoURL, ref, token string) (string, error) {
 	dir, err := os.MkdirTemp("", "reposearch-*")
 	if err != nil {
