@@ -377,33 +377,23 @@ func main() {
 			return
 		}
 
-		// support ?format=simple
-		if r.URL.Query().Get("format") == "simple" {
-			out := output(res)
-			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(out); err != nil {
-				// fallback to an empty JSON array if encoding or writing fails
-				_, _ = w.Write([]byte("[]"))
+		// original full payload (but never empty body)
+		w.Header().Set("Content-Type", "application/json")
+		if res == nil {
+			if _, err := w.Write([]byte("[]")); err != nil {
+				http.Error(w, "Failed to write response", http.StatusInternalServerError)
+				return
 			}
 		} else {
-			// original full payload (but never empty body)
-			w.Header().Set("Content-Type", "application/json")
-			if res == nil {
-				if _, err := w.Write([]byte("[]")); err != nil {
-					http.Error(w, "Failed to write response", http.StatusInternalServerError)
-					return
+			for i := range res {
+				if math.IsNaN(res[i].Score) || math.IsInf(res[i].Score, 0) {
+					res[i].Score = 0
 				}
-			} else {
-				for i := range res {
-					if math.IsNaN(res[i].Score) || math.IsInf(res[i].Score, 0) {
-						res[i].Score = 0
-					}
-				}
-				if err := json.NewEncoder(w).Encode(res); err != nil {
-					log.Printf("failed to encode response: %v", err)
-					// fallback to an empty JSON array if encoding or writing fails
-					_, _ = w.Write([]byte("[]"))
-				}
+			}
+			if err := json.NewEncoder(w).Encode(res); err != nil {
+				log.Printf("failed to encode response: %v", err)
+				// fallback to an empty JSON array if encoding or writing fails
+				_, _ = w.Write([]byte("[]"))
 			}
 		}
 
