@@ -122,7 +122,7 @@ func fileExists(p string) bool {
 	return err == nil && !fi.IsDir()
 }
 
-// bindFlags binds command-line flags to the config specification
+// bindFlags binds command-line flags to the config specification.
 func bindFlags(fs *pflag.FlagSet, c *Specification) {
 	fs.String("config", "", "Path to config file")
 
@@ -174,6 +174,7 @@ func bindFlags(fs *pflag.FlagSet, c *Specification) {
 	c.flags = copied
 }
 
+// applyChangedFlags applies only the flags that were explicitly set on the command line.
 func applyChangedFlags(fs *pflag.FlagSet, c *Specification) {
 	setStr := func(name string, dst *string) {
 		if fs.Changed(name) {

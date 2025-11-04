@@ -6,7 +6,7 @@ import { toGitHubUrl } from "./github";
 //   echo 'VITE_API_BASE=http://localhost:8080' > .env.local
 const API_BASE = (import.meta as any)?.env?.VITE_API_BASE || ""; // same-origin by default
 
-// GitHubUser represents an authenticated GitHub user
+// GitHubUser represents an authenticated GitHub user.
 interface GitHubUser {
   login: string;
   name: string;
@@ -14,7 +14,7 @@ interface GitHubUser {
   email?: string;
 }
 
-// SimpleResult represents a search result from the API
+// SimpleResult represents a search result from the API.
 interface SimpleResult {
   path: string;
   language: string;
@@ -27,7 +27,7 @@ interface SimpleResult {
   repository?: string; // The repository this result came from
 }
 
-// Minimal CSS (no Tailwind required)
+// Minimal CSS (no Tailwind required).
 const styles = `
 :root{color-scheme:light dark;}
 *{box-sizing:border-box}
