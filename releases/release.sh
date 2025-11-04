@@ -34,7 +34,7 @@ if [ "$COMPONENT_TO_BUILD" = "frontend" ] || [ "$COMPONENT_TO_BUILD" = "all" ]; 
     npm install
     npm run build
     popd
-    tar -cvzf "downloads/$TAG/reposearch-frontend.$TAG.tar.gz" -C frontend dist package.json
+    tar -cvzf "downloads/$TAG/reposearch.$TAG.tar.gz" -C frontend dist package.json
 else
     echo "Skipping frontend build"
 fi
@@ -54,7 +54,7 @@ for goos in "${GOOSS[@]}"; do
             pushd reposearch-api
             GOOS=$goos GOARCH=$goarch go build -ldflags "-X main.version=$TAG" github.com/seanblong/reposearch/cmd/api
             popd
-            tar -cvzf "downloads/$TAG/reposearch-api.$TAG.$goos.$goarch.tar.gz" reposearch-api
+            tar -cvzf "downloads/$TAG/reposearch.$TAG.$goos.$goarch.tar.gz" reposearch-api
             rm -rf reposearch-api
         fi
 
@@ -65,7 +65,7 @@ for goos in "${GOOSS[@]}"; do
             pushd reposearch-indexer
             GOOS=$goos GOARCH=$goarch go build -ldflags "-X main.version=$TAG" github.com/seanblong/reposearch/cmd/indexer
             popd
-            tar -cvzf "downloads/$TAG/reposearch-indexer.$TAG.$goos.$goarch.tar.gz" reposearch-indexer
+            tar -cvzf "downloads/$TAG/reposearch.$TAG.$goos.$goarch.tar.gz" reposearch-indexer
             rm -rf reposearch-indexer
         fi
     done
