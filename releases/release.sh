@@ -24,6 +24,10 @@ tar -cvzf "downloads/$TAG/reposearch-frontend.$TAG.tar.gz" -C frontend dist pack
 
 for goos in "${GOOSS[@]}"; do
     for goarch in "${GOARCHS[@]}"; do
+        # Mac/Darwin doesn't support 386 architecture
+        if [ "$goos" == "darwin" ] && [ "$goarch" == "386" ]; then
+            continue
+        fi
         echo "\n\nbuilding $goos $goarch"
         mkdir reposearch-api
         pushd reposearch-api

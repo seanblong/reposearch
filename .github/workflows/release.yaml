@@ -10,6 +10,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     name: Generate Release
+    outputs:
+      version: ${{ steps.version.outputs.v-version }}
     steps:
       - uses: actions/checkout@v4
       - name: Get Next Version
@@ -28,6 +30,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.version.outputs.v-version }}" --generate-notes
+  attach-assets:
+    runs-on: ubuntu-latest
+    name: Attach Release Assets
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
       - name: Setup go
         uses: actions/setup-go@v4
         with:
@@ -40,8 +48,14 @@ jobs:
         uses: AButler/upload-release-assets@3d6774fae0ed91407dc5ae29d576b166536d1777 # v3.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          files: "./releases/downloads/${{ steps.version.outputs.v-version }}/*.tar.gz"
-          release-tag: "${{ steps.version.outputs.v-version }}"
+          files: "./releases/downloads/${{ needs.release.outputs.version }}/*.tar.gz"
+          release-tag: "${{ needs.release.outputs.version }}"
+  build-and-push-docker:
+    runs-on: ubuntu-latest
+    name: Build and Push Docker Images
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -57,7 +71,7 @@ jobs:
           file: ./Dockerfile.api
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/api:${{ steps.version.outputs.v-version }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/api:${{ needs.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: BUILDPLATFORM=linux/amd64
@@ -68,7 +82,7 @@ jobs:
           file: ./Dockerfile.frontend
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/frontend:${{ steps.version.outputs.v-version }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/frontend:${{ needs.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: BUILDPLATFORM=linux/amd64
@@ -79,7 +93,7 @@ jobs:
           file: ./Dockerfile.indexer
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/indexer:${{ steps.version.outputs.v-version }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/indexer:${{ needs.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: BUILDPLATFORM=linux/amd64
