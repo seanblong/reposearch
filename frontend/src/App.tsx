@@ -6,6 +6,7 @@ import { toGitHubUrl } from "./github";
 //   echo 'VITE_API_BASE=http://localhost:8080' > .env.local
 const API_BASE = (import.meta as any)?.env?.VITE_API_BASE || ""; // same-origin by default
 
+// GitHubUser represents an authenticated GitHub user
 interface GitHubUser {
   login: string;
   name: string;
@@ -13,7 +14,7 @@ interface GitHubUser {
   email?: string;
 }
 
-// Matches /search?format=simple
+// SimpleResult represents a search result from the API
 interface SimpleResult {
   path: string;
   language: string;

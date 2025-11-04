@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Specification holds the configuration for the application.
 type Specification struct {
 	Provider     string            `yaml:"provider"`
 	APIKey       string            `yaml:"providerApiKey" envconfig:"PROVIDER_API_KEY"`
@@ -30,6 +31,7 @@ type Specification struct {
 	flags *pflag.FlagSet `ignored:"true"`
 }
 
+// AuthSpecification holds the authentication-related configuration.
 type AuthSpecification struct {
 	Enabled            bool   `yaml:"enabled"`
 	JwtSecret          string `yaml:"jwtSecret" split_words:"true"`
@@ -41,6 +43,7 @@ type AuthSpecification struct {
 
 const envPrefix = "REPOSEARCH"
 
+// Usage prints the usage information to stderr.
 func (s *Specification) Usage() {
 	fmt.Fprint(os.Stderr, s.flags.FlagUsages())
 }
@@ -81,7 +84,6 @@ func Load(configPath string, fs *pflag.FlagSet) (Specification, error) {
 		if err := loadYAML(path, &cfg); err != nil {
 			return Specification{}, fmt.Errorf("load yaml %s: %w", path, err)
 		}
-
 	}
 
 	// env overrides config file
@@ -105,8 +107,7 @@ func Load(configPath string, fs *pflag.FlagSet) (Specification, error) {
 	return cfg, nil
 }
 
-// ---------- helpers ----------
-
+// loadYAML loads a YAML file from path into the given struct pointer
 func loadYAML(path string, into any) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -115,11 +116,13 @@ func loadYAML(path string, into any) error {
 	return yaml.Unmarshal(b, into)
 }
 
+// fileExists returns true if the given path exists and is a file
 func fileExists(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && !fi.IsDir()
 }
 
+// bindFlags binds command-line flags to the config specification
 func bindFlags(fs *pflag.FlagSet, c *Specification) {
 	fs.String("config", "", "Path to config file")
 
@@ -220,6 +223,7 @@ func applyChangedFlags(fs *pflag.FlagSet, c *Specification) {
 	setStr("auth-github-allowed-org", &c.Auth.GithubAllowedOrg)
 }
 
+// setDefaults sets default values in the config specification
 func setDefaults(c *Specification) {
 	c.LogLevel = "info"
 	c.RepoRoot = "."
