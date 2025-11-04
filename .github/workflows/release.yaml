@@ -41,13 +41,13 @@ jobs:
           # Check if api, indexer, or frontend files were modified and for each
           # append the name, i.e.,  api, indexer, frontend, to the output JSON array
           JSON="["
-          if [[ "${{ steps.changed-files.outputs.api_changed }}" == "true" ]]; then
+          if [[ "${{ steps.changed-files.outputs.api_any_changed }}" == "true" ]]; then
             JSON="$JSON\"api\","
           fi
-          if [[ "${{ steps.changed-files.outputs.indexer_changed }}" == "true" ]]; then
+          if [[ "${{ steps.changed-files.outputs.indexer_any_changed }}" == "true" ]]; then
             JSON="$JSON\"indexer\","
           fi
-          if [[ "${{ steps.changed-files.outputs.frontend_changed }}" == "true" ]]; then
+          if [[ "${{ steps.changed-files.outputs.frontend_any_changed }}" == "true" ]]; then
             JSON="$JSON\"frontend\""
           fi
           # Remove last "," and add the closing bracket
