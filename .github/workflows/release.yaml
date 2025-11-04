@@ -28,7 +28,7 @@ jobs:
           git push origin ${{ steps.version.outputs.v-version }}
       - name: Create Release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.version.outputs.v-version }}" --generate-notes
   attach-assets:
@@ -107,7 +107,7 @@ jobs:
           build-args: BUILDPLATFORM=linux/amd64
       - name: Update Release with Docker Images
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           # Create a note about the Docker images
           cat << EOF > docker_images.md
@@ -142,9 +142,6 @@ jobs:
 
           EOF
 
-          # Get current release notes and append Docker info
-          # Authenticate the gh CLI using the provided token to avoid "Resource not accessible by integration" (HTTP 403)
-          echo "${GH_TOKEN}" | gh auth login --with-token
           current_notes=$(gh release view "${{ needs.release.outputs.version }}" --json body --jq '.body')
           echo "$current_notes" > current_notes.md
           cat current_notes.md docker_images.md > updated_notes.md
