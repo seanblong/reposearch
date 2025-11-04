@@ -69,6 +69,8 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history including tags
       - name: Get Next Version
         uses: reecetech/version-increment@a29aa752dc3b8118a2dc2ed93faf0e95a73a9c7e # 2024.10.1
         id: version
@@ -113,8 +115,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # Get the version for this specific component
-          VERSION=$(gh release list --limit 1 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName')
+          # Get the latest release tag for this specific component by scanning recent releases
+          VERSION=$(gh release list --limit 100 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName' | head -n1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Build Assets
         working-directory: releases
@@ -144,8 +146,8 @@ jobs:
       - name: Get component version
         id: get-version
         run: |
-          # Get the version for this specific component
-          VERSION=$(gh release list --limit 1 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName')
+          # Get the latest release tag for this specific component by scanning recent releases
+          VERSION=$(gh release list --limit 100 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName' | head -n1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ github.token }}
