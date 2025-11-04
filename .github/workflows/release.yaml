@@ -50,10 +50,13 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           files: "./releases/downloads/${{ needs.release.outputs.version }}/*.tar.gz"
           release-tag: "${{ needs.release.outputs.version }}"
-  build-and-push-docker:
+  build-and-push:
     runs-on: ubuntu-latest
     name: Build and Push Docker Images
     needs: release
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - name: Log in to GHCR
