@@ -8,11 +8,65 @@ on:
     branches:
       - main
 jobs:
+  changed:
+    runs-on: ubuntu-latest
+    name: Detect Modified Files
+    outputs:
+      modified: ${{ steps.changed.outputs.modified }}
+    steps:
+      - name: Checkout Files
+        uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+      - name: Get Changed Files
+        id: changed-files
+        uses: tj-actions/changed-files@bb3376162b179308a79fc4450262a15a8e1d6888
+        with:
+          files_yaml: |
+            api:
+              - cmd/api/**
+              - internal/**
+            indexer:
+              - cmd/indexer/**
+              - internal/ai/**
+              - internal/auth/**
+              - internal/config/**
+              - internal/indexer/**
+              - internal/store/**
+            frontend:
+              - frontend/**
+      - name: Output Modified Files
+        id: modified
+        run: |
+          # Check if api, indexer, or frontend files were modified and for each
+          # append the name, i.e.,  api, indexer, frontend, to the output JSON array
+          JSON="["
+          if [[ "${{ steps.changed-files.outputs.api_changed }}" == "true" ]]; then
+            JSON="$JSON\"api\","
+          fi
+          if [[ "${{ steps.changed-files.outputs.indexer_changed }}" == "true" ]]; then
+            JSON="$JSON\"indexer\","
+          fi
+          if [[ "${{ steps.changed-files.outputs.frontend_changed }}" == "true" ]]; then
+            JSON="$JSON\"frontend\""
+          fi
+          # Remove last "," and add the closing bracket
+          if [[ $JSON == *, ]]; then
+              JSON="${JSON%?}"
+          fi
+          JSON="$JSON]"
+          echo 'modified<<EOF' >> $GITHUB_OUTPUT
+          echo "${JSON}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
   release:
     runs-on: ubuntu-latest
     name: Generate Release
-    outputs:
-      version: ${{ steps.version.outputs.v-version }}
+    needs: changed
+    if: ${{ needs.changed.outputs.modified != '[]' }}
+    strategy:
+      matrix:
+        component: ${{ fromJson(needs.changed.outputs.modified) }}
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - name: Get Next Version
@@ -20,47 +74,81 @@ jobs:
         id: version
         with:
           scheme: conventional_commits
+          tag_prefix: "${{ matrix.component }}-"
       - name: Create Tag
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git tag ${{ steps.version.outputs.v-version }}
-          git push origin ${{ steps.version.outputs.v-version }}
+          git tag ${{ steps.version.outputs.prefixed-v-version }}
+          git push origin ${{ steps.version.outputs.prefixed-v-version }}
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.version.outputs.v-version }}" --generate-notes
+          gh release create "${{ steps.version.outputs.prefixed-v-version }}" --generate-notes --title "${{ matrix.component }} ${{ steps.version.outputs.v-version }}"
   attach-assets:
     runs-on: ubuntu-latest
     name: Attach Release Assets
-    needs: release
+    needs: [changed, release]
+    if: always() && needs.release.result == 'success'
+    strategy:
+      matrix:
+        component: ${{ fromJson(needs.changed.outputs.modified) }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Fetch all history including tags
       - name: Setup go
+        if: matrix.component != 'frontend'
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+      - name: Setup Node.js
+        if: matrix.component == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Get component version
+        id: get-version
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # Get the version for this specific component
+          VERSION=$(gh release list --limit 1 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Build Assets
         working-directory: releases
+        env:
+          COMPONENT: ${{ matrix.component }}
+          VERSION: ${{ steps.get-version.outputs.version }}
         run: |
           ./release.sh
       - name: Attach Assets
         uses: AButler/upload-release-assets@3d6774fae0ed91407dc5ae29d576b166536d1777 # v3.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          files: "./releases/downloads/${{ needs.release.outputs.version }}/*.tar.gz"
-          release-tag: "${{ needs.release.outputs.version }}"
+          files: "./releases/downloads/${{ steps.get-version.outputs.version }}/*.tar.gz"
+          release-tag: "${{ steps.get-version.outputs.version }}"
   build-and-push:
     runs-on: ubuntu-latest
     name: Build and Push Docker Images
-    needs: release
+    needs: [changed, release]
+    if: always() && needs.release.result == 'success'
+    strategy:
+      matrix:
+        component: ${{ fromJson(needs.changed.outputs.modified) }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Fetch all history including tags
+      - name: Get component version
+        id: get-version
+        run: |
+          # Get the version for this specific component
+          VERSION=$(gh release list --limit 1 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -69,39 +157,42 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build and Push Docker Image (API)
+      - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.api
+          file: ./Dockerfile.${{ matrix.component }}
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/api:${{ needs.release.outputs.version }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ matrix.component }}:${{ steps.get-version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: BUILDPLATFORM=linux/amd64
-      - name: Build and Push Docker Image (Frontend)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.frontend
-          push: true
-          platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/frontend:${{ needs.release.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: BUILDPLATFORM=linux/amd64
-      - name: Build and Push Docker Image (Indexer)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.indexer
-          push: true
-          platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/indexer:${{ needs.release.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: BUILDPLATFORM=linux/amd64
+      - name: Update Release with Docker Images
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # Create a note about the Docker image for this component
+          cat << EOF > docker_image.md
+
+          ## 🐳 Docker Image
+
+          The following Docker image has been published for this release:
+
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ matrix.component }}:${{ steps.get-version.outputs.version }}
+          \`\`\`
+
+          [View on GitHub Container Registry](https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/pkgs/container/${{ github.event.repository.name }}%2F${{ matrix.component }}).
+          EOF
+
+          # Get current release notes and append Docker info
+          current_notes=$(gh release view "${{ steps.get-version.outputs.version }}" --json body --jq '.body')
+          echo "$current_notes" > current_notes.md
+          cat current_notes.md docker_image.md > updated_notes.md
+
+          # Update the release with the new notes
+          gh release edit "${{ steps.get-version.outputs.version }}" --notes-file updated_notes.md
       - name: Update Release with Docker Images
         env:
           GITHUB_TOKEN: ${{ github.token }}
