@@ -134,8 +134,6 @@ jobs:
 
           EOF
 
-          # Get current release notes and append Docker info
-          # Authenticate the gh CLI using the provided token to avoid "Resource not accessible by integration" (HTTP 403)
           current_notes=$(gh release view "${{ needs.release.outputs.version }}" --json body --jq '.body')
           echo "$current_notes" > current_notes.md
           cat current_notes.md docker_images.md > updated_notes.md
