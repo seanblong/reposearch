@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Detect Modified Files
     outputs:
-      modified: ${{ steps.changed.outputs.modified }}
+      modified: ${{ steps.modified.outputs.modified }}
     steps:
       - name: Checkout Files
         uses: actions/checkout@v4.1.1
