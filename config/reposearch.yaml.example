@@ -12,7 +12,7 @@
 # Supported values: "stub", "openai", "vertexai"
 # Default: "stub"
 # Env: REPOSEARCH_PROVIDER
-#provider : "openai"
+#provider: "openai"
 
 # API key for the selected provider.  It is recommended to use the environment
 # variable, REPOSEARCH_PROVIDER_API_KEY, rather than hardcoding it here.
