@@ -17,8 +17,8 @@ echo "\n\nBuilding frontend..."
 pushd frontend
 npm install
 npm run build
-tar -cvzf "../downloads/$TAG/reposearch-frontend.$TAG.tar.gz" dist package.json
 popd
+tar -cvzf "downloads/$TAG/reposearch-frontend.$TAG.tar.gz" -C frontend dist package.json
 
 for goos in "${GOOSS[@]}"; do
     for goarch in "${GOARCHS[@]}"; do
