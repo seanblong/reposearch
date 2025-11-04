@@ -22,7 +22,6 @@
 #providerApiKey: "your-api-key-here"
 
 # The project ID of your OpenAI API key or the Google Cloud project.
-# Your Google Cloud project ID.
 # Env: REPOSEARCH_PROVIDER_PROJECT_ID
 #providerProjectID: "your-gcp-project-id"
 
