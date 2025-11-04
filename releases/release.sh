@@ -14,12 +14,11 @@ mkdir -p downloads/$TAG
 
 # Build frontend
 echo "\n\nBuilding frontend..."
-pushd reposearch-frontend
+pushd frontend
 npm install
 npm run build
 popd
 
-# Create frontend tarball
 tar -cvzf "downloads/$TAG/reposearch-frontend.$TAG.tar.gz" -C frontend dist package.json
 
 for goos in "${GOOSS[@]}"; do

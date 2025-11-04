@@ -1,0 +1,3 @@
+# Ignore user-generated config files
+config/config.yaml
+config/reposearch.yaml
