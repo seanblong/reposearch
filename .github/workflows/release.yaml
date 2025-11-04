@@ -69,6 +69,8 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history including tags
       - name: Get Next Version
         uses: reecetech/version-increment@a29aa752dc3b8118a2dc2ed93faf0e95a73a9c7e # 2024.10.1
         id: version
@@ -113,8 +115,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # Get the version for this specific component
-          VERSION=$(gh release list --limit 1 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName')
+          # Get the latest release tag for this specific component by scanning recent releases
+          VERSION=$(gh release list --limit 100 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName' | head -n1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Build Assets
         working-directory: releases
@@ -144,8 +146,8 @@ jobs:
       - name: Get component version
         id: get-version
         run: |
-          # Get the version for this specific component
-          VERSION=$(gh release list --limit 1 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName')
+          # Get the latest release tag for this specific component by scanning recent releases
+          VERSION=$(gh release list --limit 100 --json tagName,name --jq '.[] | select(.name | contains("${{ matrix.component }}")) | .tagName' | head -n1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -193,46 +195,3 @@ jobs:
 
           # Update the release with the new notes
           gh release edit "${{ steps.get-version.outputs.version }}" --notes-file updated_notes.md
-      - name: Update Release with Docker Images
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          # Create a note about the Docker images
-          cat << EOF > docker_images.md
-
-          ## 🐳 Docker Images
-
-          The following Docker images have been published for this release:
-
-          ### API Server
-
-          [Full notes](https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/pkgs/container/${{ github.event.repository.name }}%2Fapi).
-
-          \`\`\`bash
-          docker pull ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/api:${{ needs.release.outputs.version }}
-          \`\`\`
-
-          ### Frontend
-
-          [Full notes](https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/pkgs/container/${{ github.event.repository.name }}%2Ffrontend).
-
-          \`\`\`bash
-          docker pull ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/frontend:${{ needs.release.outputs.version }}
-          \`\`\`
-
-          ### Indexer
-
-          [Full notes](https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/pkgs/container/${{ github.event.repository.name }}%2Findexer).
-
-          \`\`\`bash
-          docker pull ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}/indexer:${{ needs.release.outputs.version }}
-          \`\`\`
-
-          EOF
-
-          current_notes=$(gh release view "${{ needs.release.outputs.version }}" --json body --jq '.body')
-          echo "$current_notes" > current_notes.md
-          cat current_notes.md docker_images.md > updated_notes.md
-
-          # Update the release with the new notes
-          gh release edit "${{ needs.release.outputs.version }}" --notes-file updated_notes.md
