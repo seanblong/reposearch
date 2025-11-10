@@ -25,7 +25,7 @@ ENV CGO_ENABLED=0 \
 
 RUN go build -trimpath -ldflags="-s -w" -o /app/indexer ./cmd/indexer
 
-FROM cgr.dev/chainguard/static
+FROM cgr.dev/chainguard/git:latest
 COPY --from=builder /app/indexer /usr/local/bin/indexer
 
 USER 65532:65532
