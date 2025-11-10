@@ -65,8 +65,8 @@ database: "postgres://postgres:postgres@localhost:5432/reposearch?sslmode=disabl
 # or provide a Git URL to clone via REPOSEARCH_GIT_REPO.
 
 # The URL of the Git repository to clone and index.
-# Env: REPOSEARCH_GIT_REPO
-#gitRepo: "https://github.com/your-org/your-repo.git"
+# Env: REPOSEARCH_REPO_URL
+#repoURL: "https://github.com/your-org/your-repo.git"
 
 # The local file path to the root of the repository you want to index.  If a URL
 # is provided then this is discarded.
