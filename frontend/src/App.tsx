@@ -492,8 +492,32 @@ export default function App() {
       const text = await r.text();
       if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
       if (text.trim().startsWith("<")) throw new Error("API returned HTML – set VITE_API_BASE to your API host or add a dev proxy.");
-      const data = JSON.parse(text) as SimpleResult[];
-      setResults(Array.isArray(data) ? data : []);
+      const data = JSON.parse(text);
+
+      // Handle different API response formats
+      let processedResults: SimpleResult[] = [];
+      if (Array.isArray(data)) {
+        processedResults = data.map(item => {
+          // Check if the data is nested under 'chunk' property
+          if (item.chunk && typeof item.chunk === 'object') {
+            return {
+              path: item.chunk.path,
+              language: item.chunk.language,
+              line_start: item.chunk.line_start,
+              line_end: item.chunk.line_end,
+              score: item.score || 0,
+              preview: item.chunk.content,
+              summary: item.chunk.summary,
+              ref: item.chunk.ref,
+              repository: item.chunk.repository
+            } as SimpleResult;
+          }
+          // Fallback to direct properties (old format)
+          return item as SimpleResult;
+        });
+      }
+
+      setResults(processedResults);
     } catch (e: any) {
       if (e?.name !== "AbortError") setError(e?.message || String(e));
     } finally {
@@ -779,17 +803,24 @@ export default function App() {
                             font: "inherit"
                           }}
                         >
-                          {r.path}
+                          {r.path || 'No path'}
                         </button>
                       ) : (
                         <a
-                          href={toGitHubUrl(r.path, r.line_start, r.line_end, r.repository || undefined, r.ref || undefined)}
+                          href={(() => {
+                            try {
+                              return toGitHubUrl(r.path || '', r.line_start, r.line_end, r.repository || undefined, r.ref || undefined);
+                            } catch (e) {
+                              console.error('Error generating GitHub URL:', e, 'for result:', r);
+                              return '#';
+                            }
+                          })()}
                           target="_blank"
                           rel="noreferrer"
                           className="mono"
                           style={{ color: "#eaeaea", textDecoration: "none", wordBreak: "break-all" }}
                         >
-                          {r.path}
+                          {r.path || 'No path'}
                         </a>
                       )}
                     </div>
