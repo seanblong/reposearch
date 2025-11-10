@@ -107,7 +107,7 @@ CREATE INDEX IF NOT EXISTS chunks_ts_fielded_gin
   ON chunks USING GIN (ts_fielded);
 
 CREATE INDEX IF NOT EXISTS chunks_summary_vec_idx
-  ON chunks USING ivfflat (summary_vec vector_cosine_ops) WITH (lists = 100);
+  ON chunks USING hnsw (summary_vec vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 `
 	_, err := s.pool.Exec(ctx, fmt.Sprintf(q, summaryDim))
 	return err
