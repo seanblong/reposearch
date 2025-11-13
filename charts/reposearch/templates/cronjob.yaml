@@ -1,0 +1,332 @@
+{{- /*
+Copyright Broadcom, Inc. All Rights Reserved.
+SPDX-License-Identifier: APACHE-2.0
+*/}}
+
+{{- if .Values.indexer.enabled }}
+{{- if .Values.indexer.jobs }}
+{{- range $jobIndex, $job := .Values.indexer.jobs }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ template "common.names.fullname" $ }}-indexer-{{ $job.name }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: indexer
+    app.kubernetes.io/job: {{ $job.name }}
+  {{- if or $.Values.indexer.cronjobAnnotations $.Values.commonAnnotations }}
+  {{- $annotations := include "common.tplvalues.merge" (dict "values" (list $.Values.indexer.cronjobAnnotations $.Values.commonAnnotations) "context" $) }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" $annotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: {{ $job.schedule | default $.Values.indexer.schedule | quote }}
+  {{- with (coalesce $job.timeZone $.Values.indexer.timeZone) }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  {{- with (coalesce $job.concurrencyPolicy $.Values.indexer.concurrencyPolicy) }}
+  concurrencyPolicy: {{ . }}
+  {{- end }}
+  {{- with (coalesce $job.failedJobsHistoryLimit $.Values.indexer.failedJobsHistoryLimit) }}
+  failedJobsHistoryLimit: {{ . }}
+  {{- end }}
+  {{- with (coalesce $job.successfulJobsHistoryLimit $.Values.indexer.successfulJobsHistoryLimit) }}
+  successfulJobsHistoryLimit: {{ . }}
+  {{- end }}
+  {{- with (coalesce $job.startingDeadlineSeconds $.Values.indexer.startingDeadlineSeconds) }}
+  startingDeadlineSeconds: {{ . }}
+  {{- end }}
+  {{- $podLabels := include "common.tplvalues.merge" (dict "values" (list $.Values.indexer.podLabels $.Values.commonLabels) "context" $) }}
+  jobTemplate:
+    spec:
+      {{- with (coalesce $job.activeDeadlineSeconds $.Values.indexer.activeDeadlineSeconds) }}
+      activeDeadlineSeconds: {{ . }}
+      {{- end }}
+      {{- with (coalesce $job.backoffLimit $.Values.indexer.backoffLimit) }}
+      backoffLimit: {{ . }}
+      {{- end }}
+      {{- with (coalesce $job.ttlSecondsAfterFinished $.Values.indexer.ttlSecondsAfterFinished) }}
+      ttlSecondsAfterFinished: {{ . }}
+      {{- end }}
+      template:
+        metadata:
+          {{- if $.Values.indexer.podAnnotations }}
+          annotations: {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.podAnnotations "context" $) | nindent 12 }}
+          {{- end }}
+          labels: {{- include "common.labels.standard" ( dict "customLabels" $podLabels "context" $ ) | nindent 12 }}
+            app.kubernetes.io/component: indexer
+        spec:
+          restartPolicy: {{ $.Values.indexer.restartPolicy | default "OnFailure" }}
+          {{- include "reposearch.imagePullSecrets" $ | nindent 10 }}
+          serviceAccountName: {{ template "reposearch.serviceAccountName" $ }}
+          automountServiceAccountToken: {{ $.Values.indexer.automountServiceAccountToken }}
+          {{- if $.Values.indexer.hostAliases }}
+          hostAliases: {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.hostAliases "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if $.Values.indexer.affinity }}
+          affinity: {{- include "common.tplvalues.render" ( dict "value" $.Values.indexer.affinity "context" $) | nindent 12 }}
+          {{- else }}
+          affinity:
+            podAffinity: {{- include "common.affinities.pods" (dict "type" $.Values.indexer.podAffinityPreset "component" "indexer" "customLabels" $podLabels "context" $) | nindent 14 }}
+            podAntiAffinity: {{- include "common.affinities.pods" (dict "type" $.Values.indexer.podAntiAffinityPreset "component" "indexer" "customLabels" $podLabels "context" $) | nindent 14 }}
+            nodeAffinity: {{- include "common.affinities.nodes" (dict "type" $.Values.indexer.nodeAffinityPreset.type "key" $.Values.indexer.nodeAffinityPreset.key "values" $.Values.indexer.nodeAffinityPreset.values) | nindent 14 }}
+          {{- end }}
+          {{- if $.Values.indexer.nodeSelector }}
+          nodeSelector: {{- include "common.tplvalues.render" ( dict "value" $.Values.indexer.nodeSelector "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if $.Values.indexer.tolerations }}
+          tolerations: {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.tolerations "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if $.Values.indexer.priorityClassName }}
+          priorityClassName: {{ $.Values.indexer.priorityClassName | quote }}
+          {{- end }}
+          {{- if $.Values.indexer.schedulerName }}
+          schedulerName: {{ $.Values.indexer.schedulerName | quote }}
+          {{- end }}
+          {{- if $.Values.indexer.topologySpreadConstraints }}
+          topologySpreadConstraints: {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.topologySpreadConstraints "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if $.Values.indexer.podSecurityContext.enabled }}
+          securityContext: {{- omit $.Values.indexer.podSecurityContext "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if $.Values.indexer.terminationGracePeriodSeconds }}
+          terminationGracePeriodSeconds: {{ $.Values.indexer.terminationGracePeriodSeconds }}
+          {{- end }}
+          containers:
+            - name: indexer
+              image: {{ template "reposearch.indexer.image" $ }}
+              imagePullPolicy: {{ $.Values.indexer.image.pullPolicy }}
+              {{- if $.Values.indexer.containerSecurityContext.enabled }}
+              securityContext: {{- include "common.compatibility.renderSecurityContext" (dict "secContext" $.Values.indexer.containerSecurityContext "context" $) | nindent 16 }}
+              {{- end }}
+              {{- if $.Values.diagnosticMode.enabled }}
+              command: {{- include "common.tplvalues.render" (dict "value" $.Values.diagnosticMode.command "context" $) | nindent 16 }}
+              {{- else if $.Values.indexer.command }}
+              command: {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.command "context" $) | nindent 16 }}
+              {{- end }}
+              {{- if $.Values.diagnosticMode.enabled }}
+              args: {{- include "common.tplvalues.render" (dict "value" $.Values.diagnosticMode.args "context" $) | nindent 16 }}
+              {{- else if $.Values.indexer.args }}
+              args: {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.args "context" $) | nindent 16 }}
+              {{- end }}
+              env:
+                - name: BITNAMI_DEBUG
+                  value: {{ ternary "true" "false" (or $.Values.indexer.image.debug $.Values.diagnosticMode.enabled) | quote }}
+                {{- if $.Values.indexer.extraEnvVars }}
+                {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.extraEnvVars "context" $) | nindent 16 }}
+                {{- end }}
+              envFrom:
+                - configMapRef:
+                    name: '{{ template "common.names.fullname" $ }}-{{ $job.name }}'
+                {{- if $.Values.indexer.extraEnvVarsCM }}
+                - configMapRef:
+                    name: {{ include "common.tplvalues.render" (dict "value" $.Values.indexer.extraEnvVarsCM "context" $) }}
+                {{- end }}
+                {{- if $.Values.indexer.extraEnvVarsSecret }}
+                - secretRef:
+                    name: {{ include "common.tplvalues.render" (dict "value" $.Values.indexer.extraEnvVarsSecret "context" $) }}
+                {{- end }}
+              {{- if $job.resources }}
+              resources: {{- toYaml $job.resources | nindent 16 }}
+              {{- else if $.Values.indexer.resources }}
+              resources: {{- toYaml $.Values.indexer.resources | nindent 16 }}
+              {{- else if ne $.Values.indexer.resourcesPreset "none" }}
+              resources: {{- include "common.resources.preset" (dict "type" $.Values.indexer.resourcesPreset) | nindent 16 }}
+              {{- end }}
+              {{- if $.Values.indexer.lifecycleHooks }}
+              lifecycle: {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.lifecycleHooks "context" $) | nindent 16 }}
+              {{- end }}
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/reposearch
+                - name: data
+                  mountPath: {{ $.Values.persistence.mountPath }}
+                  {{- if $.Values.persistence.subPath }}
+                  subPath: {{ $.Values.persistence.subPath }}
+                  {{- end }}
+                - name: empty-dir
+                  mountPath: /tmp
+                  subPath: tmp-dir
+              {{- if $.Values.indexer.extraVolumeMounts }}
+              {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.extraVolumeMounts "context" $) | nindent 16 }}
+              {{- end }}
+            {{- if $.Values.indexer.sidecars }}
+            {{- include "common.tplvalues.render" ( dict "value" $.Values.indexer.sidecars "context" $) | nindent 12 }}
+            {{- end }}
+          volumes:
+            - name: config
+              configMap:
+                name: {{ template "common.names.fullname" $ }}-{{ $job.name }}
+            - name: empty-dir
+              emptyDir: {}
+            - name: data
+            {{- if $.Values.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ default (include "common.names.fullname" $) $.Values.persistence.existingClaim }}
+            {{- else }}
+              emptyDir: {}
+            {{- end }}
+            {{- if $.Values.indexer.extraVolumes }}
+            {{- include "common.tplvalues.render" (dict "value" $.Values.indexer.extraVolumes "context" $) | nindent 12 }}
+            {{- end }}
+{{- end }}
+{{- else }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ template "common.names.fullname" . }}-indexer
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: indexer
+  {{- if or .Values.indexer.cronjobAnnotations .Values.commonAnnotations }}
+  {{- $annotations := include "common.tplvalues.merge" (dict "values" (list .Values.indexer.cronjobAnnotations .Values.commonAnnotations) "context" .) }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" $annotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: {{ .Values.indexer.schedule | quote }}
+  {{- if .Values.indexer.timeZone }}
+  timeZone: {{ .Values.indexer.timeZone | quote }}
+  {{- end }}
+  {{- if .Values.indexer.concurrencyPolicy }}
+  concurrencyPolicy: {{ .Values.indexer.concurrencyPolicy }}
+  {{- end }}
+  {{- if .Values.indexer.failedJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.indexer.failedJobsHistoryLimit }}
+  {{- end }}
+  {{- if .Values.indexer.successfulJobsHistoryLimit }}
+  successfulJobsHistoryLimit: {{ .Values.indexer.successfulJobsHistoryLimit }}
+  {{- end }}
+  {{- if .Values.indexer.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ .Values.indexer.startingDeadlineSeconds }}
+  {{- end }}
+  {{- $podLabels := include "common.tplvalues.merge" (dict "values" (list .Values.indexer.podLabels .Values.commonLabels) "context" .) }}
+  jobTemplate:
+    spec:
+      {{- if .Values.indexer.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ .Values.indexer.activeDeadlineSeconds }}
+      {{- end }}
+      {{- if .Values.indexer.backoffLimit }}
+      backoffLimit: {{ .Values.indexer.backoffLimit }}
+      {{- end }}
+      {{- if .Values.indexer.ttlSecondsAfterFinished }}
+      ttlSecondsAfterFinished: {{ .Values.indexer.ttlSecondsAfterFinished }}
+      {{- end }}
+      template:
+        metadata:
+          {{- if .Values.indexer.podAnnotations }}
+          annotations: {{- include "common.tplvalues.render" (dict "value" .Values.indexer.podAnnotations "context" $) | nindent 12 }}
+          {{- end }}
+          labels: {{- include "common.labels.standard" ( dict "customLabels" $podLabels "context" $ ) | nindent 12 }}
+            app.kubernetes.io/component: indexer
+        spec:
+          restartPolicy: {{ .Values.indexer.restartPolicy | default "OnFailure" }}
+          {{- include "reposearch.imagePullSecrets" . | nindent 10 }}
+          serviceAccountName: {{ template "reposearch.serviceAccountName" . }}
+          automountServiceAccountToken: {{ .Values.indexer.automountServiceAccountToken }}
+          {{- if .Values.indexer.hostAliases }}
+          hostAliases: {{- include "common.tplvalues.render" (dict "value" .Values.indexer.hostAliases "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.indexer.affinity }}
+          affinity: {{- include "common.tplvalues.render" ( dict "value" .Values.indexer.affinity "context" $) | nindent 12 }}
+          {{- else }}
+          affinity:
+            podAffinity: {{- include "common.affinities.pods" (dict "type" .Values.indexer.podAffinityPreset "component" "indexer" "customLabels" $podLabels "context" $) | nindent 14 }}
+            podAntiAffinity: {{- include "common.affinities.pods" (dict "type" .Values.indexer.podAntiAffinityPreset "component" "indexer" "customLabels" $podLabels "context" $) | nindent 14 }}
+            nodeAffinity: {{- include "common.affinities.nodes" (dict "type" .Values.indexer.nodeAffinityPreset.type "key" .Values.indexer.nodeAffinityPreset.key "values" .Values.indexer.nodeAffinityPreset.values) | nindent 14 }}
+          {{- end }}
+          {{- if .Values.indexer.nodeSelector }}
+          nodeSelector: {{- include "common.tplvalues.render" ( dict "value" .Values.indexer.nodeSelector "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.indexer.tolerations }}
+          tolerations: {{- include "common.tplvalues.render" (dict "value" .Values.indexer.tolerations "context" .) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.indexer.priorityClassName }}
+          priorityClassName: {{ .Values.indexer.priorityClassName | quote }}
+          {{- end }}
+          {{- if .Values.indexer.schedulerName }}
+          schedulerName: {{ .Values.indexer.schedulerName | quote }}
+          {{- end }}
+          {{- if .Values.indexer.topologySpreadConstraints }}
+          topologySpreadConstraints: {{- include "common.tplvalues.render" (dict "value" .Values.indexer.topologySpreadConstraints "context" .) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.indexer.podSecurityContext.enabled }}
+          securityContext: {{- omit .Values.indexer.podSecurityContext "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.indexer.terminationGracePeriodSeconds }}
+          terminationGracePeriodSeconds: {{ .Values.indexer.terminationGracePeriodSeconds }}
+          {{- end }}
+          containers:
+            - name: indexer
+              image: {{ template "reposearch.indexer.image" . }}
+              imagePullPolicy: {{ .Values.indexer.image.pullPolicy }}
+              {{- if .Values.indexer.containerSecurityContext.enabled }}
+              securityContext: {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.indexer.containerSecurityContext "context" $) | nindent 16 }}
+              {{- end }}
+              {{- if .Values.diagnosticMode.enabled }}
+              command: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.command "context" $) | nindent 16 }}
+              {{- else if .Values.indexer.command }}
+              command: {{- include "common.tplvalues.render" (dict "value" .Values.indexer.command "context" $) | nindent 16 }}
+              {{- end }}
+              {{- if .Values.diagnosticMode.enabled }}
+              args: {{- include "common.tplvalues.render" (dict "value" .Values.diagnosticMode.args "context" $) | nindent 16 }}
+              {{- else if .Values.indexer.args }}
+              args: {{- include "common.tplvalues.render" (dict "value" .Values.indexer.args "context" $) | nindent 16 }}
+              {{- end }}
+              env:
+                - name: BITNAMI_DEBUG
+                  value: {{ ternary "true" "false" (or .Values.indexer.image.debug .Values.diagnosticMode.enabled) | quote }}
+                {{- if .Values.indexer.extraEnvVars }}
+                {{- include "common.tplvalues.render" (dict "value" .Values.indexer.extraEnvVars "context" $) | nindent 16 }}
+                {{- end }}
+              envFrom:
+                - configMapRef:
+                    name: {{ template "common.names.fullname" . }}
+                {{- if .Values.indexer.extraEnvVarsCM }}
+                - configMapRef:
+                    name: {{ include "common.tplvalues.render" (dict "value" .Values.indexer.extraEnvVarsCM "context" $) }}
+                {{- end }}
+                {{- if .Values.indexer.extraEnvVarsSecret }}
+                - secretRef:
+                    name: {{ include "common.tplvalues.render" (dict "value" .Values.indexer.extraEnvVarsSecret "context" $) }}
+                {{- end }}
+              {{- if .Values.indexer.resources }}
+              resources: {{- toYaml .Values.indexer.resources | nindent 16 }}
+              {{- else if ne .Values.indexer.resourcesPreset "none" }}
+              resources: {{- include "common.resources.preset" (dict "type" .Values.indexer.resourcesPreset) | nindent 16 }}
+              {{- end }}
+              {{- if .Values.indexer.lifecycleHooks }}
+              lifecycle: {{- include "common.tplvalues.render" (dict "value" .Values.indexer.lifecycleHooks "context" $) | nindent 16 }}
+              {{- end }}
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/reposearch
+                - name: data
+                  mountPath: {{ .Values.persistence.mountPath }}
+                  {{- if .Values.persistence.subPath }}
+                  subPath: {{ .Values.persistence.subPath }}
+                  {{- end }}
+                - name: empty-dir
+                  mountPath: /tmp
+                  subPath: tmp-dir
+              {{- if .Values.indexer.extraVolumeMounts }}
+              {{- include "common.tplvalues.render" (dict "value" .Values.indexer.extraVolumeMounts "context" $) | nindent 16 }}
+              {{- end }}
+            {{- if .Values.indexer.sidecars }}
+            {{- include "common.tplvalues.render" ( dict "value" .Values.indexer.sidecars "context" $) | nindent 12 }}
+            {{- end }}
+          volumes:
+            - name: config
+              configMap:
+                name: {{ template "common.names.fullname" . }}
+            - name: empty-dir
+              emptyDir: {}
+            - name: data
+            {{- if .Values.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ default (include "common.names.fullname" .) .Values.persistence.existingClaim }}
+            {{- else }}
+              emptyDir: {}
+            {{- end }}
+            {{- if .Values.indexer.extraVolumes }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.indexer.extraVolumes "context" $) | nindent 12 }}
+            {{- end }}
+{{- end }}
+{{- end }}

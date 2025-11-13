@@ -37,6 +37,11 @@ To stop the application, run:
 docker-compose down
 ```
 
+### Helm
+
+To install via Helm into your Kubernetes cluster, see the [charts/reposearch](charts/reposearch)
+directory for more information.
+
 ## 💻 Developing
 
 Minimally, set the following environment variables to get started with OpenAI:

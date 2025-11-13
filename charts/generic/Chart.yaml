@@ -1,0 +1,9 @@
+apiVersion: v2
+appVersion: 0.0.1
+version: 0.1.0
+name: generic
+description: Generic Helm chart for reposearch components
+dependencies:
+  - name: common
+    repository: oci://registry-1.docker.io/bitnamicharts
+    version: 2.x.x
