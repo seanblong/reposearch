@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "common.names.fullname" . }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: indexer
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+data:
+  REPOSEARCH_PROVIDER: {{ include "common.tplvalues.render" (dict "value" (default "stub" .Values.provider) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_API_KEY: {{ include "common.tplvalues.render" (dict "value" (default "" .Values.providerApiKey) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_PROJECT_ID: {{ include "common.tplvalues.render" (dict "value" (default "" .Values.providerProjectID) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_LOCATION: {{ include "common.tplvalues.render" (dict "value" (default "us-central1" .Values.providerLocation) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_EMBEDDING_MODEL: {{ include "common.tplvalues.render" (dict "value" (default "" .Values.providerEmbedModel) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_SUMMARY_MODEL: {{ include "common.tplvalues.render" (dict "value" (default "" .Values.providerSummaryModel) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_EMBED_DIM: {{ include "common.tplvalues.render" (dict "value" (default 0 .Values.providerEmbedDim) "context" $) | quote }}
+  REPOSEARCH_DB_URL: {{ include "common.tplvalues.render" (dict "value" (default "postgres://postgres:postgres@localhost:5432/reposearch?sslmode=disable" .Values.database) "context" $) | quote }}
+  REPOSEARCH_REPO_URL: {{ include "common.tplvalues.render" (dict "value" (default "" .Values.repoURL) "context" $) | quote }}
+  REPOSEARCH_GIT_ROOT: {{ include "common.tplvalues.render" (dict "value" (default "." .Values.gitRoot) "context" $) | quote }}
+  REPOSEARCH_GIT_REF: {{ include "common.tplvalues.render" (dict "value" (default "main" .Values.gitRef) "context" $) | quote }}
+  REPOSEARCH_LOG_LEVEL: {{ include "common.tplvalues.render" (dict "value" (default "info" .Values.logLevel) "context" $) | quote }}
+  REPOSEARCH_API_PORT: {{ include "common.tplvalues.render" (dict "value" (default 8080 .Values.port) "context" $) | quote }}
+  REPOSEARCH_AUTH_ENABLED: {{ include "common.tplvalues.render" (dict "value" .Values.auth.enabled "context" $) | quote }}
+  REPOSEARCH_AUTH_JWT_SECRET: {{ include "common.tplvalues.render" (dict "value" .Values.auth.jwtSecret "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_CLIENT_ID: {{ include "common.tplvalues.render" (dict "value" .Values.auth.githubClientID "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_CLIENT_SECRET: {{ include "common.tplvalues.render" (dict "value" .Values.auth.githubClientSecret "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_REDIRECT_URL: {{ include "common.tplvalues.render" (dict "value" (default "http://localhost:8080/auth/callback" .Values.auth.redirectURL) "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_ALLOWED_ORG: {{ include "common.tplvalues.render" (dict "value" .Values.auth.githubAllowedOrg "context" $) | quote }}
+
+{{- if .Values.indexer.jobs }}
+{{- range $job := .Values.indexer.jobs }}
+{{- if $job.enabled | default true }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "common.names.fullname" $ }}-{{ $job.name }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: indexer
+    app.kubernetes.io/job: {{ $job.name }}
+  {{- if $.Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+data:
+  REPOSEARCH_PROVIDER: {{ include "common.tplvalues.render" (dict "value" (default $.Values.provider $job.provider) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_API_KEY: {{ include "common.tplvalues.render" (dict "value" (default $.Values.providerApiKey $job.providerApiKey) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_PROJECT_ID: {{ include "common.tplvalues.render" (dict "value" (default $.Values.providerProjectID $job.providerProjectID) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_LOCATION: {{ include "common.tplvalues.render" (dict "value" (default $.Values.providerLocation $job.providerLocation) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_EMBEDDING_MODEL: {{ include "common.tplvalues.render" (dict "value" (default $.Values.providerEmbedModel $job.providerEmbedModel) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_SUMMARY_MODEL: {{ include "common.tplvalues.render" (dict "value" (default $.Values.providerSummaryModel $job.providerSummaryModel) "context" $) | quote }}
+  REPOSEARCH_PROVIDER_EMBED_DIM: {{ include "common.tplvalues.render" (dict "value" (default $.Values.providerEmbedDim $job.providerEmbedDim) "context" $) | quote }}
+  REPOSEARCH_DB_URL: {{ include "common.tplvalues.render" (dict "value" (default $.Values.database $job.database) "context" $) | quote }}
+  REPOSEARCH_REPO_URL: {{ include "common.tplvalues.render" (dict "value" (default $.Values.repoURL $job.repoURL) "context" $) | quote }}
+  REPOSEARCH_GIT_ROOT: {{ include "common.tplvalues.render" (dict "value" (default $.Values.gitRoot $job.gitRoot) "context" $) | quote }}
+  REPOSEARCH_GIT_REF: {{ include "common.tplvalues.render" (dict "value" (default $.Values.gitRef $job.gitRef) "context" $) | quote }}
+  REPOSEARCH_LOG_LEVEL: {{ include "common.tplvalues.render" (dict "value" (default $.Values.logLevel $job.logLevel) "context" $) | quote }}
+  REPOSEARCH_API_PORT: {{ include "common.tplvalues.render" (dict "value" (default $.Values.port $job.port) "context" $) | quote }}
+  {{- with $job.auth }}
+  REPOSEARCH_AUTH_ENABLED: {{ include "common.tplvalues.render" (dict "value" (default $.Values.auth.enabled .enabled) "context" $) | quote }}
+  REPOSEARCH_AUTH_JWT_SECRET: {{ include "common.tplvalues.render" (dict "value" (default $.Values.auth.jwtSecret .jwtSecret) "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_CLIENT_ID: {{ include "common.tplvalues.render" (dict "value" (default $.Values.auth.githubClientID .githubClientID) "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_CLIENT_SECRET: {{ include "common.tplvalues.render" (dict "value" (default $.Values.auth.githubClientSecret .githubClientSecret) "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_REDIRECT_URL: {{ include "common.tplvalues.render" (dict "value" (default $.Values.auth.redirectURL .redirectURL) "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_ALLOWED_ORG: {{ include "common.tplvalues.render" (dict "value" (default $.Values.auth.githubAllowedOrg .githubAllowedOrg) "context" $) | quote }}
+  {{- else }}
+  REPOSEARCH_AUTH_ENABLED: {{ include "common.tplvalues.render" (dict "value" $.Values.auth.enabled "context" $) | quote }}
+  REPOSEARCH_AUTH_JWT_SECRET: {{ include "common.tplvalues.render" (dict "value" $.Values.auth.jwtSecret "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_CLIENT_ID: {{ include "common.tplvalues.render" (dict "value" $.Values.auth.githubClientID "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_CLIENT_SECRET: {{ include "common.tplvalues.render" (dict "value" $.Values.auth.githubClientSecret "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_REDIRECT_URL: {{ include "common.tplvalues.render" (dict "value" $.Values.auth.redirectURL "context" $) | quote }}
+  REPOSEARCH_AUTH_GITHUB_ALLOWED_ORG: {{ include "common.tplvalues.render" (dict "value" $.Values.auth.githubAllowedOrg "context" $) | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

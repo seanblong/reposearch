@@ -1,0 +1,19 @@
+apiVersion: v2
+name: reposearch
+description: reposearch Helm Chart
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
+# Temporarily removing dependencies for testing
+dependencies:
+  - name: postgresql
+    version: 18.1.8
+    repository: oci://registry-1.docker.io/bitnamicharts
+  - name: generic
+    alias: api
+    version: 0.1.0
+    repository: file://../generic
+  - name: generic
+    alias: frontend
+    version: 0.1.0
+    repository: file://../generic
