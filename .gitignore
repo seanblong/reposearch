@@ -1,3 +1,8 @@
 # Ignore user-generated config files
 config/config.yaml
 config/reposearch.yaml
+
+# Ignore tar files
+*.tar
+*.tar.gz
+*.tgz
