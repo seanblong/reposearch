@@ -1,0 +1,496 @@
+openapi: "3.0.3"
+info:
+  title: RepoSearch API
+  description: |
+    Natural language semantic search over indexed code repositories.
+    Authentication is optional and controlled server-side via the `/auth/status` endpoint.
+    When enabled, protected endpoints require a Bearer JWT or `auth_token` cookie.
+  version: "1.0.0"
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server (default port)
+
+tags:
+  - name: health
+    description: Health checks
+  - name: auth
+    description: Authentication (GitHub OAuth)
+  - name: repositories
+    description: Indexed repository management
+  - name: search
+    description: Semantic code search
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      description: Returns HTTP 200 when the server is running.
+      operationId: healthz
+      tags:
+        - health
+      security: []
+      responses:
+        "200":
+          description: Server is healthy
+        "500":
+          description: Server error
+
+  /auth/status:
+    get:
+      summary: Authentication status
+      description: Returns whether GitHub OAuth authentication is currently enabled on the server.
+      operationId: getAuthStatus
+      tags:
+        - auth
+      security: []
+      responses:
+        "200":
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+              example:
+                enabled: false
+        "500":
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /auth/github:
+    get:
+      summary: Initiate GitHub OAuth login
+      description: |
+        Redirects the browser to GitHub's OAuth authorization page.
+        A random state value is stored in an `oauth_state` cookie for CSRF protection.
+        Only available when authentication is enabled.
+      operationId: githubLogin
+      tags:
+        - auth
+      security: []
+      responses:
+        "307":
+          description: Redirect to GitHub OAuth authorization URL
+        "404":
+          description: Not found (authentication is disabled)
+        "500":
+          description: Internal server error
+
+  /auth/callback:
+    get:
+      summary: GitHub OAuth callback
+      description: |
+        Handles the OAuth callback from GitHub. Validates the state parameter against
+        the `oauth_state` cookie, exchanges the authorization code for an access token,
+        retrieves the GitHub user profile, and sets an `auth_token` JWT cookie.
+        Only available when authentication is enabled.
+      operationId: githubCallback
+      tags:
+        - auth
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Authorization code returned by GitHub
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          description: State value for CSRF validation (must match the `oauth_state` cookie)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Authentication successful; `auth_token` cookie is set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid or missing state/code parameter
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Failed to exchange code, fetch user info, or generate token
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: Not found (authentication is disabled)
+
+  /auth/me:
+    get:
+      summary: Get current user
+      description: |
+        Returns the authenticated user's profile and the current JWT.
+        Accepts a Bearer token in the `Authorization` header or an `auth_token` cookie.
+        Only available when authentication is enabled.
+      operationId: getMe
+      tags:
+        - auth
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Missing or invalid authentication token
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: Not found (authentication is disabled)
+
+  /auth/logout:
+    post:
+      summary: Logout
+      description: |
+        Clears the `auth_token` cookie, effectively logging the user out.
+        Only available when authentication is enabled.
+      operationId: logout
+      tags:
+        - auth
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Logged out successfully
+        "405":
+          description: Method not allowed
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: Not found (authentication is disabled)
+
+  /repositories:
+    get:
+      summary: List indexed repositories
+      description: Returns a list of all unique repository names that have been indexed.
+      operationId: listRepositories
+      tags:
+        - repositories
+      security:
+        - {}
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Array of repository names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              example:
+                - "github.com/my-org/my-repo"
+                - "github.com/my-org/another-repo"
+        "401":
+          description: Authentication required (only when auth is enabled)
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /repositories/{repo}/refs:
+    get:
+      summary: List refs for a repository
+      description: |
+        Returns all distinct Git refs (branches, tags, SHAs) that have been indexed for
+        the given repository. The `{repo}` path segment may be URL-encoded (e.g.,
+        `owner%2Frepo` for `owner/repo`).
+      operationId: getRepositoryRefs
+      tags:
+        - repositories
+      security:
+        - {}
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: repo
+          in: path
+          required: true
+          description: Repository name (URL-encoded if it contains slashes)
+          schema:
+            type: string
+          example: "github.com%2Fmy-org%2Fmy-repo"
+      responses:
+        "200":
+          description: Array of ref strings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              example:
+                - "main"
+                - "v1.2.0"
+        "400":
+          description: Invalid repository path
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          description: Authentication required (only when auth is enabled)
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /search:
+    get:
+      summary: Semantic code search
+      description: |
+        Performs a semantic (vector + lexical) search over all indexed code chunks.
+        Results are ranked by a weighted combination of embedding cosine similarity,
+        BM25/tsvector lexical rank, and trigram path similarity.
+      operationId: search
+      tags:
+        - search
+      security:
+        - {}
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Natural language search query
+          schema:
+            type: string
+          example: "database connection pooling"
+        - name: k
+          in: query
+          required: false
+          description: Maximum number of results to return (default 5)
+          schema:
+            type: integer
+            default: 5
+            minimum: 1
+          example: 10
+        - name: language
+          in: query
+          required: false
+          description: Filter results by programming language (e.g. `go`, `python`, `shell`)
+          schema:
+            type: string
+          example: "go"
+        - name: path_contains
+          in: query
+          required: false
+          description: Case-insensitive substring filter on the file path
+          schema:
+            type: string
+          example: "cmd/api"
+        - name: repository
+          in: query
+          required: false
+          description: Filter results to a specific repository name
+          schema:
+            type: string
+          example: "github.com/my-org/my-repo"
+        - name: ref
+          in: query
+          required: false
+          description: Filter results to a specific Git ref (branch, tag, or SHA)
+          schema:
+            type: string
+          example: "main"
+      responses:
+        "200":
+          description: Ranked list of matching code chunks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchResult"
+        "400":
+          description: Missing required query parameter `q`
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          description: Authentication required (only when auth is enabled)
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT issued by `/auth/callback` or `/auth/me`
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+      description: JWT stored in the `auth_token` HTTP-only cookie
+
+  schemas:
+    AuthStatus:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Whether GitHub OAuth authentication is enabled on the server
+
+    GithubUser:
+      type: object
+      required:
+        - login
+        - name
+        - email
+        - avatar_url
+      properties:
+        login:
+          type: string
+          description: GitHub username
+          example: "octocat"
+        name:
+          type: string
+          description: Display name
+          example: "The Octocat"
+        email:
+          type: string
+          format: email
+          description: Email address
+          example: "octocat@github.com"
+        avatar_url:
+          type: string
+          format: uri
+          description: URL of the user's avatar image
+          example: "https://avatars.githubusercontent.com/u/583231"
+
+    AuthResponse:
+      type: object
+      required:
+        - user
+      properties:
+        user:
+          $ref: "#/components/schemas/GithubUser"
+        token:
+          type: string
+          description: JWT for subsequent authenticated requests (omitted when not applicable)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    Chunk:
+      type: object
+      description: A contiguous block of code or text extracted from a repository file
+      required:
+        - id
+        - repository
+        - ref
+        - path
+        - language
+        - summary
+        - content
+        - line_start
+        - line_end
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Unique chunk identifier
+          example: "abc123"
+        repository:
+          type: string
+          description: Repository name the chunk belongs to
+          example: "github.com/my-org/my-repo"
+        ref:
+          type: string
+          description: Git ref (branch, tag, or SHA) the chunk was indexed from
+          example: "main"
+        path:
+          type: string
+          description: File path within the repository
+          example: "internal/store/store.go"
+        language:
+          type: string
+          description: Detected programming language of the file
+          example: "go"
+        summary:
+          type: string
+          description: AI-generated summary of the chunk
+          example: "Implements database connection pooling for PostgreSQL using pgxpool."
+        content:
+          type: string
+          description: Raw source content of the chunk
+          example: "func New(ctx context.Context, url string) (*Store, error) { ... }"
+        line_start:
+          type: integer
+          description: First line of the chunk within the file (1-based)
+          example: 32
+        line_end:
+          type: integer
+          description: Last line of the chunk within the file (inclusive, 1-based)
+          example: 44
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the chunk was first indexed
+          example: "2024-01-15T10:30:00Z"
+
+    SearchResult:
+      type: object
+      description: A single search result pairing a code chunk with its relevance score
+      required:
+        - chunk
+        - score
+      properties:
+        chunk:
+          $ref: "#/components/schemas/Chunk"
+        score:
+          type: number
+          format: double
+          description: |
+            Relevance score in the range [0, 1]. Computed as a weighted combination of
+            semantic embedding similarity (80%), lexical BM25 rank (15%), and trigram
+            path similarity (5%), adjusted by script-type and noise-path heuristics.
+          example: 0.923
